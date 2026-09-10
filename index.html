@@ -68,7 +68,8 @@
     line-height:.92;
     text-transform:uppercase;
     font-size:clamp(3rem,12.5vw,13rem);
-    max-width:15ch;
+    max-width:94vw;
+    white-space:nowrap;
     transition:opacity .06s;
   }
   #name .amp{font-weight:300;font-style:italic;letter-spacing:0}
@@ -123,19 +124,7 @@
 <body>
   <div id="bubbles"></div>
 
-  <div class="frame">
-    <div class="row">
-      <div class="tag">SODA FOUNTAIN<br><span class="muted">NAME GENERATOR</span></div>
-      <div class="tag r">EST. 2026<br><span class="muted">EDITION Nº <span id="counter">001</span></span></div>
-    </div>
-    <div class="row" style="align-items:flex-end">
-      <div class="tag muted">A—Z INDEX</div>
-      <div class="tag r muted">FIZZ / FLOAT / FOUNTAIN</div>
-    </div>
-  </div>
-
   <div id="stage">
-    <div class="kicker" id="kicker">PROPOSED IDENTITY</div>
     <div id="name">SODA&nbsp;PARLOUR</div>
     <div class="sub" id="sub">TAP TO GENERATE</div>
   </div>
@@ -155,14 +144,39 @@
 
 <script>
 /* ---------------- word banks ---------------- */
-const BASES = ["SODA","MEZZ","FLOAT","FIZZ","SPRITZ","SOCIAL","FOUNTAIN","PARLOUR",
-  "ASSEMBLY","SELTZER","CHERRY","MALT","EGG CREAM","PHOSPHATE","RICKEY","TONIC",
-  "SUNDAY","SPARKLE","JERK","COUNTER","POP","HUDSON'S","GOOD","SHOPPE"];
+/* the big three are weighted heavier so they show up more often */
+const BASES = [
+  // prominent — repeated to raise their odds
+  "FIZZ","FIZZ","FIZZ","FIZZ","FIZZ",
+  "FLOAT","FLOAT","FLOAT","FLOAT","FLOAT",
+  "SODA","SODA","SODA","SODA","SODA",
+  // soda vocabulary
+  "SPRITZ","SELTZER","POP","TONIC","RICKEY","PHOSPHATE","EGG CREAM","CHERRY","SPARKLE",
+  // ice cream vocabulary
+  "SCOOP","SUNDAE","SWIRL","MALT","SHAKE","FREEZE","CUSTARD","CHURN","SOFT SERVE","CONE","CREAM",
+  // alcohol vocabulary
+  "HIGHBALL","NIGHTCAP","SPIKED","PROOF","SALOON","HAPPY HOUR","LAST CALL","TIPSY",
+  // house / generic
+  "MEZZ","FOUNTAIN","PARLOUR","ASSEMBLY","SOCIAL","HUDSON'S","GOOD","SHOPPE","SUNDAY","JERK","COUNTER"
+];
 
-const ANCHORS = ["PARLOUR","HOUSE","ROOM","WORKS","CLUB","ASSEMBLY","SUPPLY","STAND",
-  "BAR","COUNTER","FOUNTAIN","SOCIAL"];
+const ANCHORS = [
+  // house / generic
+  "PARLOUR","HOUSE","ROOM","WORKS","CLUB","ASSEMBLY","SUPPLY","STAND","COUNTER","FOUNTAIN","SOCIAL",
+  // ice cream
+  "CREAMERY","SCOOP SHOP","FREEZER","SOFT SERVE",
+  // alcohol
+  "BAR","LOUNGE","TAPROOM","SALOON","NIGHTCAP","SOCIAL CLUB"
+];
 
-const AND_TAILS = ["SUNDRIES","COMPANY","PARLOUR","SUPPLY","SODA","CO."];
+const AND_TAILS = [
+  "SUNDRIES","COMPANY","PARLOUR","SUPPLY","SODA","CO.",
+  "CREAM","SCOOP","CONE",              // ice cream
+  "SPIRITS","SPRITZ","BITTERS","BAR"   // alcohol
+];
+
+/* occasional modifier out front — SPIKED FLOAT CLUB, FROZEN SODA CO. */
+const PREFIXES = ["SPIKED","HARD","FROZEN","SOFT","GOLDEN","LATE","GOOD","HAPPY","BOOZY","DOUBLE"];
 
 /* templates: each returns {parts:[{t,cls}], key} */
 const TEMPLATES = [
@@ -182,6 +196,8 @@ const TEMPLATES = [
   b => two(b, "COMPANY"),
   // BASE + & COMPANY
   b => amp(b, "COMPANY"),
+  // PREFIX + BASE + ANCHOR -> SPIKED FLOAT CLUB
+  b => ({parts:[{t:pick(PREFIXES),cls:"suffix"},{t:" "},{t:b},{t:" "},{t:pick(ANCHORS)}]}),
 ];
 
 function pick(a){return a[Math.floor(Math.random()*a.length)]}
@@ -201,11 +217,7 @@ function build(){
 /* ---------------- render ---------------- */
 const nameEl = document.getElementById('name');
 const subEl = document.getElementById('sub');
-const counterEl = document.getElementById('counter');
-const kickerEl = document.getElementById('kicker');
 let current = "SODA PARLOUR";
-let editionNo = 1;
-const KICKERS = ["PROPOSED IDENTITY","WORKING TITLE","CANDIDATE Nº","ON THE MARQUEE","FRONT-OF-HOUSE","FOR CONSIDERATION","THE SIGN READS"];
 
 function paint(res){
   nameEl.innerHTML = res.parts.map(p=>{
@@ -213,8 +225,23 @@ function paint(res){
     return `<span class="${p.cls||''}">${p.t}</span>`;
   }).join("");
   current = res.parts.map(p=>p.t).join("").replace(/\s+/g," ").trim();
+  fitText();
   nameEl.classList.remove('flash'); void nameEl.offsetWidth; nameEl.classList.add('flash');
 }
+
+/* shrink long names so they always fit the viewport width */
+function fitText(){
+  nameEl.style.fontSize = "";                 // back to CSS clamp
+  const maxW = window.innerWidth * 0.92;
+  let size = parseFloat(getComputedStyle(nameEl).fontSize);
+  let guard = 0;
+  while(nameEl.scrollWidth > maxW && size > 22 && guard < 80){
+    size *= 0.94;
+    nameEl.style.fontSize = size + "px";
+    guard++;
+  }
+}
+window.addEventListener('resize', fitText);
 
 let spinning = false;
 function generate(){
@@ -229,9 +256,6 @@ function generate(){
     if(ticks>=total){
       clearInterval(iv);
       spinning = false;
-      editionNo++;
-      counterEl.textContent = String(editionNo).padStart(3,'0');
-      kickerEl.textContent = pick(KICKERS);
       subEl.textContent = savedNames.includes(current) ? "★ SAVED" : "TAP TO GENERATE · ♡ TO SAVE";
       fizz();
     }
