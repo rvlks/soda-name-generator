@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SODA — NAME GENERATOR</title>
+<style>
+  :root{
+    --bg:#f4f1ea;
+    --ink:#101010;
+    --line:#101010;
+    --pop:#e8452a;   /* cherry */
+    --pop2:#f2a900;  /* orange fizz */
+    --pop3:#2b6b5b;  /* bottle green */
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+    position:relative;
+    height:100vh;
+    height:100dvh;
+    cursor:default;
+    user-select:none;
+  }
+
+  /* ---------- bubbles ---------- */
+  #bubbles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+  .bubble{
+    position:absolute;bottom:-60px;border-radius:50%;
+    border:1.5px solid var(--ink);
+    opacity:0;
+    animation:rise linear infinite;
+  }
+  @keyframes rise{
+    0%{transform:translateY(0) translateX(0) scale(.6);opacity:0}
+    10%{opacity:.5}
+    50%{transform:translateY(-52vh) translateX(14px) scale(1)}
+    90%{opacity:.5}
+    100%{transform:translateY(-108vh) translateX(-10px) scale(1.1);opacity:0}
+  }
+
+  /* ---------- chrome / labels ---------- */
+  .frame{position:fixed;inset:0;z-index:2;pointer-events:none;padding:22px 26px;display:flex;flex-direction:column;justify-content:space-between}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;width:100%}
+  .tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;line-height:1.5}
+  .tag.r{text-align:right}
+  .muted{opacity:.55}
+  .rule{height:1px;background:var(--line);width:100%;margin:9px 0}
+
+  /* ---------- stage ---------- */
+  #stage{
+    position:relative;z-index:1;height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:0 4vw;cursor:pointer;
+  }
+  .kicker{
+    font-size:12px;letter-spacing:.34em;text-transform:uppercase;
+    opacity:.6;margin-bottom:2.2vh;height:16px;
+  }
+  #name{
+    font-weight:800;
+    letter-spacing:-.02em;
+    line-height:.92;
+    text-transform:uppercase;
+    font-size:clamp(3rem,12.5vw,13rem);
+    max-width:15ch;
+    transition:opacity .06s;
+  }
+  #name .amp{font-weight:300;font-style:italic;letter-spacing:0}
+  #name .suffix{color:var(--pop)}
+  .flash{animation:flash .5s ease-out}
+  @keyframes flash{0%{color:var(--pop)}100%{color:var(--ink)}}
+
+  .sub{margin-top:3vh;font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.5;height:14px}
+
+  /* ---------- controls ---------- */
+  .controls{
+    position:fixed;left:0;right:0;bottom:26px;z-index:3;
+    display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;padding:0 20px;
+  }
+  button{
+    font-family:inherit;background:var(--ink);color:var(--bg);
+    border:1px solid var(--ink);cursor:pointer;
+    text-transform:uppercase;letter-spacing:.18em;font-size:13px;font-weight:600;
+    padding:16px 34px;border-radius:40px;transition:transform .1s ease, background .15s;
+  }
+  button:hover{transform:translateY(-2px)}
+  button:active{transform:translateY(1px)}
+  .btn-ghost{background:transparent;color:var(--ink)}
+  .btn-ghost:hover{background:var(--ink);color:var(--bg)}
+
+  /* ---------- saved drawer ---------- */
+  #saved{
+    position:fixed;top:0;right:0;height:100%;width:min(340px,86vw);z-index:6;
+    background:var(--bg);border-left:1px solid var(--line);
+    transform:translateX(100%);transition:transform .35s cubic-bezier(.7,0,.2,1);
+    padding:22px 24px;overflow-y:auto;
+  }
+  #saved.open{transform:translateX(0)}
+  #saved h3{font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:16px;display:flex;justify-content:space-between}
+  #saved .close{cursor:pointer;pointer-events:auto}
+  .savedItem{border-top:1px solid var(--line);padding:14px 0;font-weight:700;text-transform:uppercase;font-size:18px;letter-spacing:-.01em;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .savedItem .x{opacity:.4;cursor:pointer;font-weight:400;font-size:14px}
+  .savedItem .x:hover{opacity:1;color:var(--pop)}
+  .empty{opacity:.4;font-size:12px;letter-spacing:.05em;text-transform:none;font-weight:400}
+  .cornerbtn{pointer-events:auto;cursor:pointer;font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid transparent}
+  .cornerbtn:hover{border-bottom-color:var(--ink)}
+  .heart{color:var(--pop)}
+
+  .hint{position:fixed;bottom:86px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.22em;text-transform:uppercase;opacity:.35;z-index:3}
+  @media (max-width:640px){
+    .hint{display:none}
+    button{padding:14px 24px;font-size:11px}
+    .controls{bottom:18px}
+  }
+</style>
+</head>
+<body>
+  <div id="bubbles"></div>
+
+  <div class="frame">
+    <div class="row">
+      <div class="tag">SODA FOUNTAIN<br><span class="muted">NAME GENERATOR</span></div>
+      <div class="tag r">EST. 2026<br><span class="muted">EDITION Nº <span id="counter">001</span></span></div>
+    </div>
+    <div class="row" style="align-items:flex-end">
+      <div class="tag muted">A—Z INDEX</div>
+      <div class="tag r muted">FIZZ / FLOAT / FOUNTAIN</div>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div class="kicker" id="kicker">PROPOSED IDENTITY</div>
+    <div id="name">SODA&nbsp;PARLOUR</div>
+    <div class="sub" id="sub">TAP TO GENERATE</div>
+  </div>
+
+  <div class="hint">SPACE — GENERATE&nbsp;&nbsp;·&nbsp;&nbsp;S — SAVE&nbsp;&nbsp;·&nbsp;&nbsp;C — COPY</div>
+
+  <div class="controls">
+    <button id="gen">Generate ↻</button>
+    <button class="btn-ghost" id="save">♡ Save</button>
+    <button class="btn-ghost" id="open">Saved (<span id="savedCount">0</span>)</button>
+  </div>
+
+  <aside id="saved">
+    <h3>SAVED NAMES <span class="close" id="close">CLOSE ✕</span></h3>
+    <div id="savedList"><div class="empty">Nothing saved yet. Hit ♡ on a name you like.</div></div>
+  </aside>
+
+<script>
+/* ---------------- word banks ---------------- */
+const BASES = ["SODA","MEZZ","FLOAT","FIZZ","SPRITZ","SOCIAL","FOUNTAIN","PARLOUR",
+  "ASSEMBLY","SELTZER","CHERRY","MALT","EGG CREAM","PHOSPHATE","RICKEY","TONIC",
+  "SUNDAY","SPARKLE","JERK","COUNTER","POP","HUDSON'S","GOOD","SHOPPE"];
+
+const ANCHORS = ["PARLOUR","HOUSE","ROOM","WORKS","CLUB","ASSEMBLY","SUPPLY","STAND",
+  "BAR","COUNTER","FOUNTAIN","SOCIAL"];
+
+const AND_TAILS = ["SUNDRIES","COMPANY","PARLOUR","SUPPLY","SODA","CO."];
+
+/* templates: each returns {parts:[{t,cls}], key} */
+const TEMPLATES = [
+  // BASE + ANCHOR   -> SODA PARLOUR
+  b => two(b, pick(ANCHORS)),
+  b => two(b, pick(ANCHORS)),
+  // BASE + CO.      -> FLOAT CO.
+  b => two(b, "CO.", "suffix"),
+  // BASE + & CO.    -> FIZZ & CO.
+  b => amp(b, "CO.", "suffix"),
+  b => amp(b, "CO.", "suffix"),
+  // BASE + & TAIL   -> SODA & SUNDRIES
+  b => amp(b, pick(AND_TAILS)),
+  // BASE + SUPPLY CO. -> SODA SUPPLY CO.
+  b => ({parts:[{t:b},{t:" "},{t:"SUPPLY"},{t:" "},{t:"CO.",cls:"suffix"}]}),
+  // BASE + COMPANY  -> FOUNTAIN COMPANY
+  b => two(b, "COMPANY"),
+  // BASE + & COMPANY
+  b => amp(b, "COMPANY"),
+];
+
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function two(a,b,cls){return {parts:[{t:a},{t:" "},{t:b,cls}]}}
+function amp(a,b,cls){return {parts:[{t:a},{t:" "},{t:"&",cls:"amp"},{t:" "},{t:b,cls}]}}
+
+function build(){
+  let base = pick(BASES);
+  let tpl = pick(TEMPLATES);
+  let res = tpl(base);
+  // avoid echoes like "SODA & SODA" or "PARLOUR PARLOUR"
+  const words = res.parts.filter(p=>p.t.trim() && p.t!=="&").map(p=>p.t);
+  if(new Set(words).size !== words.length) return build();
+  return res;
+}
+
+/* ---------------- render ---------------- */
+const nameEl = document.getElementById('name');
+const subEl = document.getElementById('sub');
+const counterEl = document.getElementById('counter');
+const kickerEl = document.getElementById('kicker');
+let current = "SODA PARLOUR";
+let editionNo = 1;
+const KICKERS = ["PROPOSED IDENTITY","WORKING TITLE","CANDIDATE Nº","ON THE MARQUEE","FRONT-OF-HOUSE","FOR CONSIDERATION","THE SIGN READS"];
+
+function paint(res){
+  nameEl.innerHTML = res.parts.map(p=>{
+    if(p.t===" ") return "&nbsp;";
+    return `<span class="${p.cls||''}">${p.t}</span>`;
+  }).join("");
+  current = res.parts.map(p=>p.t).join("").replace(/\s+/g," ").trim();
+  nameEl.classList.remove('flash'); void nameEl.offsetWidth; nameEl.classList.add('flash');
+}
+
+let spinning = false;
+function generate(){
+  if(spinning) return;
+  spinning = true;
+  subEl.textContent = "";
+  let ticks = 0;
+  const total = 9 + Math.floor(Math.random()*5);
+  const iv = setInterval(()=>{
+    paint(build());
+    ticks++;
+    if(ticks>=total){
+      clearInterval(iv);
+      spinning = false;
+      editionNo++;
+      counterEl.textContent = String(editionNo).padStart(3,'0');
+      kickerEl.textContent = pick(KICKERS);
+      subEl.textContent = savedNames.includes(current) ? "★ SAVED" : "TAP TO GENERATE · ♡ TO SAVE";
+      fizz();
+    }
+  }, 55);
+}
+
+/* ---------------- fizz burst on land ---------------- */
+function fizz(){
+  const n = 14;
+  const cx = window.innerWidth/2;
+  const cy = window.innerHeight/2;
+  for(let i=0;i<n;i++){
+    const d = document.createElement('div');
+    const size = 4+Math.random()*10;
+    d.style.cssText=`position:fixed;left:${cx}px;top:${cy}px;width:${size}px;height:${size}px;
+      border:1.5px solid var(--ink);border-radius:50%;z-index:1;pointer-events:none;opacity:.8`;
+    document.body.appendChild(d);
+    const ang = Math.random()*Math.PI*2;
+    const dist = 80+Math.random()*220;
+    const dx = Math.cos(ang)*dist, dy=Math.sin(ang)*dist - 60;
+    d.animate([
+      {transform:'translate(0,0) scale(.4)',opacity:.9},
+      {transform:`translate(${dx}px,${dy}px) scale(1)`,opacity:0}
+    ],{duration:700+Math.random()*500,easing:'cubic-bezier(.2,.7,.3,1)'}).onfinish=()=>d.remove();
+  }
+}
+
+/* ---------------- saved ---------------- */
+let savedNames = [];
+try{ savedNames = JSON.parse(localStorage.getItem('soda_saved')||'[]'); }catch(e){ savedNames=[]; }
+const savedList = document.getElementById('savedList');
+const savedCount = document.getElementById('savedCount');
+const drawer = document.getElementById('saved');
+
+function persist(){ try{ localStorage.setItem('soda_saved',JSON.stringify(savedNames)); }catch(e){} }
+function renderSaved(){
+  savedCount.textContent = savedNames.length;
+  if(!savedNames.length){ savedList.innerHTML='<div class="empty">Nothing saved yet. Hit ♡ on a name you like.</div>'; return; }
+  savedList.innerHTML = savedNames.map((n,i)=>
+    `<div class="savedItem"><span data-copy="${n}">${n}</span><span class="x" data-del="${i}">remove</span></div>`
+  ).join("");
+}
+function save(){
+  if(spinning) return;
+  if(savedNames.includes(current)){ subEl.textContent="ALREADY SAVED"; return; }
+  savedNames.unshift(current); persist(); renderSaved();
+  subEl.textContent = "★ SAVED";
+  document.getElementById('save').innerHTML = "♥ Saved";
+  setTimeout(()=>document.getElementById('save').innerHTML="♡ Save",900);
+}
+function copy(txt){
+  navigator.clipboard?.writeText(txt).then(()=>{ subEl.textContent="COPIED — "+txt; },()=>{});
+}
+
+savedList.addEventListener('click',e=>{
+  const del = e.target.getAttribute('data-del');
+  const cp = e.target.getAttribute('data-copy');
+  if(del!==null){ savedNames.splice(+del,1); persist(); renderSaved(); }
+  else if(cp){ copy(cp); }
+});
+
+/* ---------------- wire up ---------------- */
+document.getElementById('gen').onclick = generate;
+document.getElementById('stage').onclick = generate;
+document.getElementById('save').onclick = e=>{e.stopPropagation();save();};
+document.getElementById('open').onclick = e=>{e.stopPropagation();drawer.classList.add('open');};
+document.getElementById('close').onclick = ()=>drawer.classList.remove('open');
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); generate(); }
+  else if(e.key==='s'||e.key==='S'){ save(); }
+  else if(e.key==='c'||e.key==='C'){ copy(current); }
+  else if(e.key==='Escape'){ drawer.classList.remove('open'); }
+});
+
+/* ---------------- bubbles bg ---------------- */
+(function(){
+  const wrap=document.getElementById('bubbles');
+  const N=26;
+  for(let i=0;i<N;i++){
+    const b=document.createElement('div');
+    const s=8+Math.random()*46;
+    b.className='bubble';
+    b.style.width=s+'px'; b.style.height=s+'px';
+    b.style.left=(Math.random()*100)+'vw';
+    b.style.animationDuration=(7+Math.random()*11)+'s';
+    b.style.animationDelay=(-Math.random()*14)+'s';
+    if(Math.random()<0.18) b.style.borderColor='var(--pop)';
+    else if(Math.random()<0.12) b.style.borderColor='var(--pop3)';
+    wrap.appendChild(b);
+  }
+})();
+
+renderSaved();
+generate();
+</script>
+</body>
+</html>
